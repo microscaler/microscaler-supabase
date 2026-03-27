@@ -1,0 +1,102 @@
+# Mirrors octopilot/cronjob-log-monitor/.github/workflows/release.yml (workflow_dispatch + semver bump +
+# commit/tag + GitHub Release). octopilot-workflows workflow-release.yml uses bump-version, which has no
+# Chart.yaml mode; we bump helm/microscaler-supabase/Chart.yaml here with the same semantics as
+# octopilot/actions/bump-version (patch/minor/major).
+#
+# Requires secret REPO_PAT (contents:write) so the version commit triggers CI — same rationale as
+# https://github.com/octopilot/octopilot-workflows/blob/main/.github/workflows/workflow-release.yml
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type (Helm chart version in Chart.yaml)"
+        required: true
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.REPO_PAT }}
+          fetch-depth: 0
+
+      - name: Bump Helm chart version
+        id: bump
+        shell: bash
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          python3 <<'PY'
+          import os, re, sys
+          from pathlib import Path
+
+          bump = os.environ["BUMP"].strip().lower()
+          chart = Path("helm/microscaler-supabase/Chart.yaml")
+          text = chart.read_text(encoding="utf-8")
+          m = re.search(r"^version:\s*(\d+)\.(\d+)\.(\d+)(?:-([\w.-]+))?\s*$", text, re.MULTILINE)
+          if not m:
+              print("Could not find semver in Chart.yaml (expected key version: X.Y.Z)", file=sys.stderr)
+              sys.exit(1)
+          x, y, z = int(m.group(1)), int(m.group(2)), int(m.group(3))
+          prerel = m.group(4)
+          if prerel:
+              print("Prerelease versions in Chart.yaml are not supported by this workflow.", file=sys.stderr)
+              sys.exit(1)
+          old = f"{x}.{y}.{z}"
+          if bump == "patch":
+              z += 1
+          elif bump == "minor":
+              y += 1
+              z = 0
+          elif bump == "major":
+              x += 1
+              y = 0
+              z = 0
+          else:
+              print(f"Unknown bump: {bump}", file=sys.stderr)
+              sys.exit(1)
+          new = f"{x}.{y}.{z}"
+          text_new = re.sub(
+              r"^version:\s*(\d+)\.(\d+)\.(\d+)(?:-([\w.-]+))?\s*$",
+              f"version: {new}",
+              text,
+              count=1,
+              flags=re.MULTILINE,
+          )
+          chart.write_text(text_new, encoding="utf-8")
+          out = os.environ["GITHUB_OUTPUT"]
+          with open(out, "a", encoding="utf-8") as f:
+              f.write(f"version={new}\n")
+              f.write(f"old_version={old}\n")
+          print(f"Bumped Chart version {old} -> {new}")
+          PY
+
+      - name: Commit, tag, and push
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: "helm/microscaler-supabase/Chart.yaml"
+          message: "chore(release): bump chart version to v${{ steps.bump.outputs.version }}"
+          tag: "v${{ steps.bump.outputs.version }}"
+          author_name: "github-actions[bot]"
+          author_email: "github-actions[bot]@users.noreply.github.com"
+          github_token: ${{ secrets.REPO_PAT }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.bump.outputs.version }}
+          generate_release_notes: true
+          token: ${{ secrets.REPO_PAT }}
