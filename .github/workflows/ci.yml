@@ -93,6 +93,12 @@ jobs:
         run: |
           if [ -n "${OCTO:-}" ]; then echo "uuid=$OCTO" >> "$GITHUB_OUTPUT"; else echo "uuid=$FB" >> "$GITHUB_OUTPUT"; fi
 
+  # Skaffold Dockerfile artifacts: octopilot-pipeline-tools runs `docker build` on the host op process
+  # (see internal/cmd/build.go). The ghcr.io/octopilot/op container mounts the socket but typically
+  # does not ship the docker CLI, so Skaffold fails with "docker: executable file not found".
+  # Pack/helm chart builds use the Docker API from Go and work inside op. Cronjob-log-monitor only
+  # uses Pack, so it never hits this. Here: Dockerfile matrix rows build with Buildx on the runner;
+  # Pack rows still use octopilot/actions/integration-build-artifact.
   integration-artifacts:
     name: Integration (${{ matrix.output_key }})
     needs: [detect, integration-validate]
@@ -106,8 +112,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build and push artifact
-        id: build
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Dockerfile image on runner (ttl.sh)
+        id: docker_build
+        if: matrix.build_method == 'docker'
+        env:
+          TTL_UUID: ${{ needs.integration-validate.outputs.uuid }}
+          BUILDX_NO_DEFAULT_ATTESTATIONS: "1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          SUFFIX="${{ matrix.suffix }}"
+          TAG="ttl.sh/${TTL_UUID}-${SUFFIX}:1h"
+          CTX="${{ matrix.context }}"
+          DF="${{ matrix.dockerfile }}"
+          if [ -z "$DF" ] || [ "$DF" = "null" ]; then DF="Dockerfile"; fi
+          echo "Building ${TAG} (context=${CTX}, file=${DF})"
+          docker buildx build --platform linux/amd64 --push \
+            -t "${TAG}" \
+            -f "${CTX}/${DF}" \
+            "${CTX}"
+          echo "${{ matrix.output_key }}=${TAG}" > outputs.txt
+          jq -n --arg img "${{ matrix.image }}" --arg tag "${TAG}" \
+            '{builds:[{imageName:$img,tag:$tag}]}' > build_result.json
+
+      - name: Build and push (Octopilot Pack / chart)
+        id: op_build
+        if: matrix.build_method == 'pack'
         uses: octopilot/actions/integration-build-artifact@main
         with:
           artifact: ${{ toJson(matrix) }}
@@ -117,8 +150,8 @@ jobs:
       - name: Upload artifact outputs
         run: |
           mkdir -p artifact-out
-          mv outputs.txt "artifact-out/${{ matrix.output_key }}.txt" 2>/dev/null || true
-          [ -f build_result.json ] && cp build_result.json artifact-out/ || true
+          mv outputs.txt "artifact-out/${{ matrix.output_key }}.txt"
+          [ -f build_result.json ] && cp build_result.json artifact-out/
 
       - uses: actions/upload-artifact@v4
         with:

@@ -1,5 +1,6 @@
 # Octopilot / detect-contexts reads this file to derive CI matrix, Helm chart paths,
-# and integration_matrix (Docker + Pack chart builds via octopilot/actions/integration-build-artifact).
+# and integration_matrix. Chart uses Pack inside octopilot/op; Dockerfile postgres image is built
+# on the GitHub runner with Buildx (op container lacks docker CLI for `docker build` — see AGENTS.md).
 #
 # Image names:
 #   - Postgres: context must be a directory containing Dockerfile (detect uses docker build, not pack).
