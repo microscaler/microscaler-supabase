@@ -18,7 +18,19 @@ That combination matters when you want **one cluster** for product data *and* he
 | **Build toolchain (Arrow/Parquet)** | Apache **Arrow & Parquet** dev libs in the build stage | Supports compiling Parquet-related extension code; final runtime ships the copied extensions above. |
 | **Helm stack** | Parquet PVC mounted read-only at `/data/parquet` (optional) | Gives Postgres a stable place for **Hive-style Parquet layouts** to pair with analytical queries. |
 
-**Shipped vs build-only:** the Dockerfile also attempts builds of `cstore_fdw`, `parquet_fdw`, and `pg_hint_plan`; only **pg_duckdb**, **pgvector**, and **TimescaleDB** artifacts are copied into the final image today. Re-run `just build-postgres` (or CI) after changing [`docker/postgres/Dockerfile`](docker/postgres/Dockerfile); builds are multi-stage and can take a long time on first run.
+**Shipped vs build-only:** only **pg_duckdb**, **pgvector**, and **TimescaleDB** artifacts are copied into the final image. Re-run `just build-postgres` (or CI) after changing [`docker/postgres/Dockerfile`](docker/postgres/Dockerfile); builds are multi-stage and can take a long time on first run.
+
+### Optional extensions not in the runtime image (yet)
+
+The Dockerfile still contains **optional build steps** for **`cstore_fdw`**, **`parquet_fdw`**, and **`pg_hint_plan`**. They are **not** copied into the published image today, and the builds are allowed to fail without failing the whole image (`|| echo "Warning: …"`).
+
+| Extension | Purpose | Value vs what we already ship |
+|-----------|---------|-------------------------------|
+| **cstore_fdw** | Columnar foreign tables (legacy Citus cstore format). | Largely **superseded** for analytical scans by **pg_duckdb** and for time-oriented data by **TimescaleDB**; upstream is a poor fit for **PostgreSQL 17** without real porting. |
+| **parquet_fdw** | FDW to read **Parquet files** as external tables. | **Overlaps** with **pg_duckdb** + **`/data/parquet`**: DuckDB-in-Postgres already targets Parquet and lake-style layouts with a more actively evolved path. |
+| **pg_hint_plan** | **Optimizer hints** for bad plans (join order, indexes, etc.). | **Orthogonal** to analytics extensions: occasional **ops** value, not core to the “Supabase + DuckDB + vectors + time-series” story. |
+
+**Policy:** we will **fold these into the runtime image** (enable builds, fix Docker `COPY`, init SQL, and preload policy as needed) **once they are maintained upstream** for our target Postgres major—i.e. reliable **PG 17** (or whatever the Supabase base tracks), clear release branches or tags, and Arrow/API alignment where relevant—so we are not carrying private forks or brittle `sed`-only hacks. Until then, **pg_duckdb**, **TimescaleDB**, and **pgvector** remain the supported analytical surface.
 
 ## Contents
 
