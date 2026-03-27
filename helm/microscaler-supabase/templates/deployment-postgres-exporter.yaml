@@ -1,0 +1,35 @@
+{{- if .Values.postgresExporter.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-exporter
+  namespace: {{ include "microscaler-supabase.namespace" . }}
+  labels:
+    {{- include "microscaler-supabase.labels" . | nindent 4 }}
+    app: postgres-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-exporter
+  template:
+    metadata:
+      labels:
+        app: postgres-exporter
+        {{- include "microscaler-supabase.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: postgres-exporter
+          image: {{ .Values.postgresExporter.image | quote }}
+          env:
+            - name: DATA_SOURCE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microscaler-supabase.infraSecretName" . }}
+                  key: {{ .Values.secret.existingSecretKeys.postgresExporterDataSourceUri | quote }}
+          ports:
+            - containerPort: 9187
+              name: metrics
+          resources:
+            {{- toYaml .Values.postgresExporter.resources | nindent 12 }}
+{{- end }}

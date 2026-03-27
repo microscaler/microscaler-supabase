@@ -1,0 +1,14 @@
+{{- if and .Values.parquetLake.enabled .Values.parquetLake.createConfigMap }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: parquet-lake-structure
+  namespace: {{ include "microscaler-supabase.namespace" . }}
+  labels:
+    {{- include "microscaler-supabase.labels" . | nindent 4 }}
+data:
+  README.md: |
+    # Parquet Data Lake
+    Mounted at /data/parquet in postgres (for pg_duckdb read_parquet).
+    Use Hive-style paths: e.g. price/minute/symbol=NVDA/date=2025-10-31/
+{{- end }}

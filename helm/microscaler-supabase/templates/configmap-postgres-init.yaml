@@ -1,0 +1,57 @@
+{{- if .Values.postgres.enabled }}
+{{- $base := include "microscaler-supabase.initRolePassword" . | trim }}
+{{- $auth := default $base .Values.postgres.initPasswords.authenticator }}
+{{- $sa := default $base .Values.postgres.initPasswords.supabase_admin }}
+{{- $saa := default $base .Values.postgres.initPasswords.supabase_auth_admin }}
+{{- $ssa := default $base .Values.postgres.initPasswords.supabase_storage_admin }}
+{{- $sfa := default $base .Values.postgres.initPasswords.supabase_functions_admin }}
+{{- $pgb := default $base .Values.postgres.initPasswords.pgbouncer }}
+{{- $jwt := include "microscaler-supabase.jwtSecret" . | trim | replace "'" "''" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: {{ include "microscaler-supabase.namespace" . }}
+  labels:
+    {{- include "microscaler-supabase.labels" . | nindent 4 }}
+data:
+  00-roles.sql: |
+    CREATE SCHEMA IF NOT EXISTS auth;
+    CREATE SCHEMA IF NOT EXISTS storage;
+    CREATE SCHEMA IF NOT EXISTS _realtime;
+    CREATE SCHEMA IF NOT EXISTS realtime;
+    DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; GRANT USAGE ON SCHEMA public, storage, auth TO anon; END IF; END $$;
+    DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; GRANT ALL ON SCHEMA public, storage, auth TO service_role; END IF; END $$;
+    DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; GRANT USAGE ON SCHEMA public, storage, auth TO authenticated; END IF; END $$;
+    DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticator') THEN CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD '{{ $auth | replace "'" "''" }}'; GRANT anon TO authenticator; GRANT service_role TO authenticator; ELSE ALTER ROLE authenticator WITH PASSWORD '{{ $auth | replace "'" "''" }}'; END IF; END $$;
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_admin') THEN CREATE ROLE supabase_admin WITH LOGIN PASSWORD '{{ $sa | replace "'" "''" }}' SUPERUSER CREATEDB CREATEROLE; ELSE ALTER ROLE supabase_admin WITH PASSWORD '{{ $sa | replace "'" "''" }}'; END IF;
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_auth_admin') THEN CREATE ROLE supabase_auth_admin WITH LOGIN PASSWORD '{{ $saa | replace "'" "''" }}'; ELSE ALTER ROLE supabase_auth_admin WITH PASSWORD '{{ $saa | replace "'" "''" }}'; END IF;
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_storage_admin') THEN CREATE ROLE supabase_storage_admin WITH LOGIN PASSWORD '{{ $ssa | replace "'" "''" }}'; ELSE ALTER ROLE supabase_storage_admin WITH PASSWORD '{{ $ssa | replace "'" "''" }}'; END IF;
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_functions_admin') THEN CREATE ROLE supabase_functions_admin WITH LOGIN PASSWORD '{{ $sfa | replace "'" "''" }}' NOINHERIT CREATEROLE; ELSE ALTER ROLE supabase_functions_admin WITH PASSWORD '{{ $sfa | replace "'" "''" }}'; END IF;
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'pgbouncer') THEN CREATE ROLE pgbouncer WITH LOGIN PASSWORD '{{ $pgb | replace "'" "''" }}'; ELSE ALTER ROLE pgbouncer WITH PASSWORD '{{ $pgb | replace "'" "''" }}'; END IF;
+    END $$;
+    GRANT USAGE, CREATE ON SCHEMA public TO supabase_auth_admin; GRANT ALL ON ALL TABLES IN SCHEMA public TO supabase_auth_admin; ALTER SCHEMA auth OWNER TO supabase_auth_admin; GRANT ALL ON SCHEMA auth TO supabase_auth_admin;
+    DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_type WHERE typname = 'factor_type' AND typnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'auth')) THEN CREATE TYPE auth.factor_type AS ENUM ('totp', 'webauthn', 'phone'); ALTER TYPE auth.factor_type OWNER TO supabase_auth_admin; END IF; END $$;
+    GRANT CREATE ON DATABASE postgres TO supabase_storage_admin; ALTER SCHEMA storage OWNER TO supabase_storage_admin; GRANT ALL ON SCHEMA storage TO supabase_storage_admin;
+    CREATE SCHEMA IF NOT EXISTS supabase_functions; ALTER SCHEMA supabase_functions OWNER TO postgres; GRANT ALL ON SCHEMA supabase_functions TO supabase_functions_admin;
+  01-jwt.sql: |
+    ALTER DATABASE postgres SET "app.settings.jwt_secret" TO '{{ $jwt }}';
+    ALTER DATABASE postgres SET "app.settings.jwt_exp" TO '3600';
+  02-realtime.sql: |
+    CREATE SCHEMA IF NOT EXISTS realtime; ALTER SCHEMA realtime OWNER TO postgres;
+    CREATE SCHEMA IF NOT EXISTS _realtime; ALTER SCHEMA _realtime OWNER TO postgres;
+    GRANT USAGE ON SCHEMA realtime, _realtime TO supabase_admin; GRANT ALL ON ALL TABLES IN SCHEMA realtime, _realtime TO supabase_admin;
+  03-_supabase.sql: |
+    CREATE DATABASE _supabase WITH OWNER postgres;
+  04-logs.sql: |
+    \c _supabase
+    CREATE SCHEMA IF NOT EXISTS _analytics;
+    ALTER SCHEMA _analytics OWNER TO postgres;
+    \c postgres
+  05-pooler.sql: |
+    \c _supabase
+    CREATE SCHEMA IF NOT EXISTS _supavisor;
+    ALTER SCHEMA _supavisor OWNER TO postgres;
+    \c postgres
+{{- end }}

@@ -1,0 +1,22 @@
+# Octopilot / detect-contexts reads this file to derive CI matrix, Helm chart paths,
+# and integration_matrix (Docker + Pack chart builds via octopilot/actions/integration-build-artifact).
+#
+# Image names:
+#   - Postgres: context must be a directory containing Dockerfile (detect uses docker build, not pack).
+#   - Chart: image name must end with -chart; context is the chart dir; octopilot helm buildpack packages OCI chart.
+#
+# Override registry prefix (ghcr.io/<owner>/...) to match your org before pushing to GHCR.
+apiVersion: skaffold/v4beta7
+kind: Config
+metadata:
+  name: microscaler-supabase
+build:
+  artifacts:
+    - image: ghcr.io/casibbald/microscaler-supabase-postgres
+      context: docker/postgres
+      docker:
+        dockerfile: Dockerfile
+    - image: ghcr.io/casibbald/microscaler-supabase-chart
+      context: helm/microscaler-supabase
+      buildpacks:
+        builder: ghcr.io/octopilot/builder-jammy-base:latest

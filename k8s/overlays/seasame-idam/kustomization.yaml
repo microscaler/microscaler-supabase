@@ -1,0 +1,19 @@
+# Overlay for seasame-idam: same stack as base, PVs patched for Kind cluster sesame-idam.
+# Apply from microscaler-supabase: kubectl apply -k k8s/overlays/seasame-idam
+# Or from seasame-idam: just supabase-apply (runs apply from ../microscaler-supabase with this overlay)
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../data
+
+patches:
+  - path: postgres-pv-patch.yaml
+    target:
+      kind: PersistentVolume
+      name: postgres-pv
+  - path: parquet-lake-pv-patch.yaml
+    target:
+      kind: PersistentVolume
+      name: parquet-lake-pv

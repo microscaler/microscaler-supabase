@@ -1,0 +1,26 @@
+{{- if and .Values.parquetLake.enabled (eq .Values.persistence.mode "staticPv") }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Values.persistence.parquet.pvName }}
+  labels:
+    {{- include "microscaler-supabase.labels" . | nindent 4 }}
+spec:
+  capacity:
+    storage: {{ .Values.persistence.parquet.size }}
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: {{ .Values.persistence.reclaimPolicy }}
+  storageClassName: {{ .Values.persistence.storageClassName }}
+  hostPath:
+    path: {{ .Values.persistence.parquet.hostPath }}
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - {{ .Values.persistence.nodeHostname | quote }}
+{{- end }}

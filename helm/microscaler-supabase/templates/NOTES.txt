@@ -1,0 +1,12 @@
+1. Postgres (release {{ .Release.Name }}): connect from inside the cluster with
+   postgres.{{ include "microscaler-supabase.namespace" . }}.svc.cluster.local:5432
+
+2. First install: ensure PVCs bind before the postgres pod schedules. With persistence.mode=staticPv,
+   PVs use hostPath and nodeAffinity; the node must match persistence.nodeHostname.
+
+3. Uninstall: PVs with reclaimPolicy Retain are not removed by helm uninstall; delete PVs manually if needed.
+
+4. Secrets: for production use secret.create=false and an existing Secret that includes
+   POSTGRES_EXPORTER_DATA_SOURCE_URI (or the key set in secret.existingSecretKeys.postgresExporterDataSourceUri).
+
+5. When using secret.existingSecret, set postgres.initPasswords.default to match your role passwords used in postgres-init SQL.

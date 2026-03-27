@@ -1,0 +1,77 @@
+{{- if .Values.postgresMeta.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-meta
+  namespace: {{ include "microscaler-supabase.namespace" . }}
+  labels:
+    {{- include "microscaler-supabase.labels" . | nindent 4 }}
+    app: postgres-meta
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-meta
+  template:
+    metadata:
+      labels:
+        app: postgres-meta
+        {{- include "microscaler-supabase.labels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: postgres-meta
+          image: {{ .Values.postgresMeta.image | quote }}
+          ports:
+            - containerPort: 7808
+              name: http
+          env:
+            - name: PG_META_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.infraConfig.name }}
+                  key: POSTGRES_META_PORT
+            - name: PG_META_DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.infraConfig.name }}
+                  key: POSTGRES_META_DB_HOST
+            - name: PG_META_DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.infraConfig.name }}
+                  key: POSTGRES_META_DB_PORT
+            - name: PG_META_DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.infraConfig.name }}
+                  key: POSTGRES_META_DB_NAME
+            - name: PG_META_DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.infraConfig.name }}
+                  key: POSTGRES_META_DB_USER
+            - name: PG_META_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microscaler-supabase.infraSecretName" . }}
+                  key: POSTGRES_META_DB_PASSWORD
+            - name: CRYPTO_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microscaler-supabase.infraSecretName" . }}
+                  key: POSTGRES_META_DB_PASSWORD_ENCRYPTION_KEY
+          resources:
+            {{- toYaml .Values.postgresMeta.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 7808
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 7808
+            initialDelaySeconds: 30
+            periodSeconds: 10
+{{- end }}

@@ -1,0 +1,16 @@
+{{- if and .Values.parquetLake.enabled (ne .Values.persistence.mode "existingClaim") }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.persistence.parquet.pvcName }}
+  namespace: {{ include "microscaler-supabase.namespace" . }}
+  labels:
+    {{- include "microscaler-supabase.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.persistence.storageClassName | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.parquet.size }}
+{{- end }}

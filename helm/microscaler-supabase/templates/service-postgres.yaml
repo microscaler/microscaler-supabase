@@ -1,0 +1,21 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: {{ include "microscaler-supabase.namespace" . }}
+  labels:
+    {{- include "microscaler-supabase.labels" . | nindent 4 }}
+    app: postgres
+spec:
+  type: {{ .Values.postgres.service.type | quote }}
+  ports:
+    - port: {{ .Values.postgres.service.port }}
+      targetPort: postgres
+      name: postgres
+      {{- if eq .Values.postgres.service.type "NodePort" }}
+      nodePort: {{ .Values.postgres.service.nodePort }}
+      {{- end }}
+  selector:
+    app: postgres
+{{- end }}

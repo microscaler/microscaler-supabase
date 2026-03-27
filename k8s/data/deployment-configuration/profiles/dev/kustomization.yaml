@@ -1,0 +1,22 @@
+# Generates infra-config ConfigMap and infra-secrets Secret for Supabase stack.
+# Requires application.properties (in repo) and application.secrets.env (copy from PriceWhisperer or provide SOPS-decrypted).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: data
+
+configMapGenerator:
+  - name: infra-config
+    namespace: data
+    envs:
+      - application.properties
+
+secretGenerator:
+  - name: infra-secrets
+    namespace: data
+    envs:
+      - application.secrets.env
+
+generatorOptions:
+  disableNameSuffixHash: true
+  immutable: false

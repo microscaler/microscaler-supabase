@@ -1,0 +1,36 @@
+# Kustomization for Supabase stack (consumable by PriceWhisperer, seasame-idam, etc.)
+# Apply order: deployment-configuration (infra-config + infra-secrets), namespace, PVs, claims, workloads.
+# Set NODE_NAME in persistent-volumes or use kustomize replacement for your Kind node.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: data
+
+resources:
+  - namespace.yaml
+  - deployment-configuration/profiles/dev
+  - persistent-volumes.yaml
+  - claims.yaml
+  - postgres-config.yaml
+  - postgres.yaml
+  - postgres-meta.yaml
+  - postgres-exporter.yaml
+  - parquet-lake.yaml
+  # Uncomment for full stack (requires more keys in application.properties + application.secrets.env):
+  # - supavisor.yaml
+  # - gotrue.yaml
+  # - postgrest.yaml
+  # - realtime.yaml
+  # - storage-api.yaml
+  # - supabase-studio.yaml
+  # - edge-runtime.yaml
+  # - postgres-meta.yaml
+  # - parquet-lake.yaml
+  # - supavisor.yaml
+  # - gotrue.yaml
+  # - postgrest.yaml
+  # - realtime.yaml
+  # - storage-api.yaml
+  # - supabase-studio.yaml
+  # - edge-runtime.yaml

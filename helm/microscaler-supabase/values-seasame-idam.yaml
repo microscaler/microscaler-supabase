@@ -1,0 +1,10 @@
+# Example: Kind cluster sesame-idam (replaces k8s/overlays/seasame-idam PV patches).
+# Usage: helm upgrade --install supabase ./helm/microscaler-supabase -n data -f helm/microscaler-supabase/values-seasame-idam.yaml
+
+persistence:
+  mode: staticPv
+  nodeHostname: sesame-idam-control-plane
+  postgres:
+    hostPath: /mnt/sesame-idam-data/postgres
+  parquet:
+    hostPath: /mnt/sesame-idam-data/parquet-lake

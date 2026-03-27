@@ -1,0 +1,12 @@
+{{- if .Values.createNamespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "microscaler-supabase.namespace" . }}
+  labels:
+    {{- include "microscaler-supabase.labels" . | nindent 4 }}
+    app: data
+    managed-by: microscaler-supabase
+  annotations:
+    description: "Supabase stack namespace (postgres, gotrue, postgrest, realtime, storage, etc.)"
+{{- end }}

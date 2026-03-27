@@ -1,0 +1,201 @@
+# Supabase PostgreSQL (microscaler-supabase canonical)
+# Service name: postgres. Port-forward: kubectl port-forward -n data svc/postgres 5432:5432
+# Requires: infra-config, infra-secrets, postgres-storage and parquet-lake-storage PVCs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: data
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+      annotations:
+        prometheus.io/scrape: "true"
+    spec:
+      initContainers:
+      - name: create-dirs
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - |
+          mkdir -p /var/lib/postgresql/data
+          chmod -R 755 /var/lib/postgresql/data
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: storage
+          mountPath: /var/lib/postgresql/data
+      - name: configure-postgres
+        image: docker.io/casibbald/postgres:17-duckdb-supabase-v2
+        command:
+        - sh
+        - -c
+        - |
+          export PGDATA=/var/lib/postgresql/data
+          until [ -d "$PGDATA" ]; do echo "Waiting for data directory..."; sleep 1; done
+          if [ -f "$PGDATA/postgresql.conf" ]; then
+            if grep -q "^shared_preload_libraries" "$PGDATA/postgresql.conf"; then
+              EXISTING_LIBS=$(grep "^shared_preload_libraries" "$PGDATA/postgresql.conf" | sed "s/^shared_preload_libraries = '\(.*\)'/\1/" | tr -d "'")
+              NEW_LIBS="pg_duckdb,timescaledb"
+              for lib in $(echo "$EXISTING_LIBS" | tr ',' ' '); do
+                ! echo "$NEW_LIBS" | grep -q "$lib" && NEW_LIBS="$NEW_LIBS,$lib"
+              done
+              sed -i "s|^shared_preload_libraries = .*|shared_preload_libraries = '$NEW_LIBS'|" "$PGDATA/postgresql.conf"
+            else
+              echo "" >> "$PGDATA/postgresql.conf"
+              echo "shared_preload_libraries = 'pg_duckdb,timescaledb,pg_stat_statements,pgaudit,plpgsql,plpgsql_check,pg_cron,pg_net,pgsodium,auto_explain,pg_tle,plan_filter,supabase_vault'" >> "$PGDATA/postgresql.conf"
+            fi
+            grep -q "duckdb.enable_optimizer" "$PGDATA/postgresql.conf" || echo "duckdb.enable_optimizer = on" >> "$PGDATA/postgresql.conf"
+            grep -q "^pg_stat_statements.track" "$PGDATA/postgresql.conf" || echo "pg_stat_statements.track = all" >> "$PGDATA/postgresql.conf"
+            grep -q "^log_destination" "$PGDATA/postgresql.conf" || echo "log_destination = 'stderr'" >> "$PGDATA/postgresql.conf"
+            grep -q "^logging_collector" "$PGDATA/postgresql.conf" || echo "logging_collector = off" >> "$PGDATA/postgresql.conf"
+            grep -q "^log_min_messages" "$PGDATA/postgresql.conf" || echo "log_min_messages = info" >> "$PGDATA/postgresql.conf"
+          fi
+          echo "PostgreSQL configuration updated"
+        volumeMounts:
+        - name: storage
+          mountPath: /var/lib/postgresql/data
+        env:
+        - name: PGDATA
+          valueFrom:
+            configMapKeyRef:
+              name: infra-config
+              key: PGDATA
+      containers:
+      - name: postgres
+        image: docker.io/casibbald/postgres:17-duckdb-supabase-v2
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: infra-config
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: infra-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: infra-secrets
+              key: POSTGRES_PASSWORD
+        - name: PGDATA
+          valueFrom:
+            configMapKeyRef:
+              name: infra-config
+              key: PGDATA
+        volumeMounts:
+        - name: storage
+          mountPath: /var/lib/postgresql/data
+        - name: init-scripts
+          mountPath: /docker-entrypoint-initdb.d
+          readOnly: true
+        - name: parquet-lake
+          mountPath: /data/parquet
+          readOnly: true
+        resources:
+          requests:
+            memory: 256Mi
+            cpu: 100m
+          limits:
+            memory: 512Mi
+            cpu: 500m
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - PGPASSWORD=postgres pg_isready -U postgres -d postgres -h 127.0.0.1 -p 5432
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - PGPASSWORD=postgres pg_isready -U postgres -d postgres -h 127.0.0.1 -p 5432
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: storage
+        persistentVolumeClaim:
+          claimName: postgres-storage
+      - name: init-scripts
+        configMap:
+          name: postgres-init
+      - name: parquet-lake
+        persistentVolumeClaim:
+          claimName: parquet-lake-storage
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: data
+data:
+  00-roles.sql: |
+    CREATE SCHEMA IF NOT EXISTS auth;
+    CREATE SCHEMA IF NOT EXISTS storage;
+    CREATE SCHEMA IF NOT EXISTS _realtime;
+    CREATE SCHEMA IF NOT EXISTS realtime;
+    DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN NOINHERIT; GRANT USAGE ON SCHEMA public, storage, auth TO anon; END IF; END $$;
+    DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS; GRANT ALL ON SCHEMA public, storage, auth TO service_role; END IF; END $$;
+    DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN NOINHERIT; GRANT USAGE ON SCHEMA public, storage, auth TO authenticated; END IF; END $$;
+    DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticator') THEN CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD 'postgres'; GRANT anon TO authenticator; GRANT service_role TO authenticator; ELSE ALTER ROLE authenticator WITH PASSWORD 'postgres'; END IF; END $$;
+    DO $$ BEGIN
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_admin') THEN CREATE ROLE supabase_admin WITH LOGIN PASSWORD 'postgres' SUPERUSER CREATEDB CREATEROLE; ELSE ALTER ROLE supabase_admin WITH PASSWORD 'postgres'; END IF;
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_auth_admin') THEN CREATE ROLE supabase_auth_admin WITH LOGIN PASSWORD 'postgres'; ELSE ALTER ROLE supabase_auth_admin WITH PASSWORD 'postgres'; END IF;
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_storage_admin') THEN CREATE ROLE supabase_storage_admin WITH LOGIN PASSWORD 'postgres'; ELSE ALTER ROLE supabase_storage_admin WITH PASSWORD 'postgres'; END IF;
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'supabase_functions_admin') THEN CREATE ROLE supabase_functions_admin WITH LOGIN PASSWORD 'postgres' NOINHERIT CREATEROLE; ELSE ALTER ROLE supabase_functions_admin WITH PASSWORD 'postgres'; END IF;
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'pgbouncer') THEN CREATE ROLE pgbouncer WITH LOGIN PASSWORD 'postgres'; ELSE ALTER ROLE pgbouncer WITH PASSWORD 'postgres'; END IF;
+    END $$;
+    GRANT USAGE, CREATE ON SCHEMA public TO supabase_auth_admin; GRANT ALL ON ALL TABLES IN SCHEMA public TO supabase_auth_admin; ALTER SCHEMA auth OWNER TO supabase_auth_admin; GRANT ALL ON SCHEMA auth TO supabase_auth_admin;
+    DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_type WHERE typname = 'factor_type' AND typnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'auth')) THEN CREATE TYPE auth.factor_type AS ENUM ('totp', 'webauthn', 'phone'); ALTER TYPE auth.factor_type OWNER TO supabase_auth_admin; END IF; END $$;
+    GRANT CREATE ON DATABASE postgres TO supabase_storage_admin; ALTER SCHEMA storage OWNER TO supabase_storage_admin; GRANT ALL ON SCHEMA storage TO supabase_storage_admin;
+    CREATE SCHEMA IF NOT EXISTS supabase_functions; ALTER SCHEMA supabase_functions OWNER TO postgres; GRANT ALL ON SCHEMA supabase_functions TO supabase_functions_admin;
+  01-jwt.sql: |
+    ALTER DATABASE postgres SET "app.settings.jwt_secret" TO 'your-super-secret-jwt-token-with-at-least-32-characters-long';
+    ALTER DATABASE postgres SET "app.settings.jwt_exp" TO '3600';
+  02-realtime.sql: |
+    CREATE SCHEMA IF NOT EXISTS realtime; ALTER SCHEMA realtime OWNER TO postgres;
+    CREATE SCHEMA IF NOT EXISTS _realtime; ALTER SCHEMA _realtime OWNER TO postgres;
+    GRANT USAGE ON SCHEMA realtime, _realtime TO supabase_admin; GRANT ALL ON ALL TABLES IN SCHEMA realtime, _realtime TO supabase_admin;
+  03-_supabase.sql: |
+    CREATE DATABASE _supabase WITH OWNER postgres;
+  04-logs.sql: |
+    \c _supabase
+    CREATE SCHEMA IF NOT EXISTS _analytics;
+    ALTER SCHEMA _analytics OWNER TO postgres;
+    \c postgres
+  05-pooler.sql: |
+    \c _supabase
+    CREATE SCHEMA IF NOT EXISTS _supavisor;
+    ALTER SCHEMA _supavisor OWNER TO postgres;
+    \c postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: data
+spec:
+  type: NodePort
+  ports:
+  - port: 5432
+    targetPort: 5432
+    nodePort: 30432
+    name: postgres
+  selector:
+    app: postgres

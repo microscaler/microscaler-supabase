@@ -1,0 +1,22 @@
+# Secrets (use application.secrets.env.example as template; real secrets never committed)
+k8s/data/deployment-configuration/profiles/dev/application.secrets.env
+*.env
+!.env.example
+!application.secrets.env.example
+
+# Local / IDE
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Python / just
+.venv/
+__pycache__/
+*.pyc
+
+# Build
+/target/
+*.log
+docs/PRD.md

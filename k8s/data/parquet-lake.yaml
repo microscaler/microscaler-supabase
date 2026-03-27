@@ -1,0 +1,12 @@
+# Parquet Data Lake - ConfigMap with directory structure docs (PVC in claims.yaml)
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: parquet-lake-structure
+  namespace: data
+data:
+  README.md: |
+    # Parquet Data Lake
+    Mounted at /data/parquet in postgres (for pg_duckdb read_parquet).
+    Use Hive-style paths: e.g. price/minute/symbol=NVDA/date=2025-10-31/

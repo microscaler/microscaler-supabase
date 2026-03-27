@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "createNamespace": { "type": "boolean" },
+    "nameOverride": { "type": "string" },
+    "postgres": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "replicas": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "postgresMeta": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "postgresExporter": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "parquetLake": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "createConfigMap": { "type": "boolean" }
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["staticPv", "existingClaim", "dynamic"]
+        },
+        "storageClassName": { "type": "string" },
+        "reclaimPolicy": { "type": "string", "enum": ["Retain", "Delete"] },
+        "nodeHostname": { "type": "string" },
+        "postgres": { "type": "object" },
+        "parquet": { "type": "object" },
+        "existingClaim": {
+          "type": "object",
+          "properties": {
+            "postgres": { "type": "string" },
+            "parquet": { "type": "string" }
+          }
+        }
+      }
+    },
+    "infraConfig": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "namespacePlaceholder": { "type": "string" },
+        "data": { "type": "object" },
+        "extra": { "type": "object" }
+      }
+    },
+    "secret": {
+      "type": "object",
+      "properties": {
+        "create": { "type": "boolean" },
+        "name": { "type": "string" },
+        "existingSecret": { "type": "string" },
+        "data": { "type": "object" },
+        "existingSecretKeys": {
+          "type": "object",
+          "properties": {
+            "postgresExporterDataSourceUri": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

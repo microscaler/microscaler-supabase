@@ -1,0 +1,12 @@
+---
+# Supabase / Data Stack Namespace
+# If stuck in "Terminating": kubectl patch namespace data -p '{"metadata":{"finalizers":[]}}' --type=merge
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: data
+  labels:
+    app: data
+    managed-by: microscaler-supabase
+  annotations:
+    description: "Supabase stack namespace (postgres, gotrue, postgrest, realtime, storage, etc.)"

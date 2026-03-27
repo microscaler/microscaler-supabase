@@ -1,0 +1,49 @@
+# PersistentVolumes for Supabase stack (postgres, parquet-lake)
+# Set NODE_NAME to your Kind control-plane hostname (e.g. pricewhisperer-control-plane, sesame-idam-control-plane)
+# or use kustomize replacement. hostPath is used for local dev; adjust for your cluster.
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  hostPath:
+    path: /var/lib/data/postgres
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - supabase-control-plane
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: parquet-lake-pv
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  hostPath:
+    path: /var/lib/data/parquet-lake
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - supabase-control-plane

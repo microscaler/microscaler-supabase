@@ -1,0 +1,97 @@
+# Postgres Meta - Supabase DB metadata API (used by Studio, etc.)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-meta
+  namespace: data
+  labels:
+    app: postgres-meta
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-meta
+  template:
+    metadata:
+      labels:
+        app: postgres-meta
+    spec:
+      containers:
+      - name: postgres-meta
+        image: supabase/postgres-meta:v0.91.0
+        ports:
+        - containerPort: 7808
+          name: http
+        env:
+        - name: PG_META_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: infra-config
+              key: POSTGRES_META_PORT
+        - name: PG_META_DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: infra-config
+              key: POSTGRES_META_DB_HOST
+        - name: PG_META_DB_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: infra-config
+              key: POSTGRES_META_DB_PORT
+        - name: PG_META_DB_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: infra-config
+              key: POSTGRES_META_DB_NAME
+        - name: PG_META_DB_USER
+          valueFrom:
+            configMapKeyRef:
+              name: infra-config
+              key: POSTGRES_META_DB_USER
+        - name: PG_META_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: infra-secrets
+              key: POSTGRES_META_DB_PASSWORD
+        - name: CRYPTO_KEY
+          valueFrom:
+            secretKeyRef:
+              name: infra-secrets
+              key: POSTGRES_META_DB_PASSWORD_ENCRYPTION_KEY
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 7808
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 7808
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-meta
+  namespace: data
+  labels:
+    app: postgres-meta
+spec:
+  type: ClusterIP
+  ports:
+  - port: 7808
+    targetPort: 7808
+    protocol: TCP
+    name: http
+  selector:
+    app: postgres-meta

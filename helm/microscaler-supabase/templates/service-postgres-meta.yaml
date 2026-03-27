@@ -1,0 +1,19 @@
+{{- if .Values.postgresMeta.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-meta
+  namespace: {{ include "microscaler-supabase.namespace" . }}
+  labels:
+    {{- include "microscaler-supabase.labels" . | nindent 4 }}
+    app: postgres-meta
+spec:
+  type: ClusterIP
+  ports:
+    - port: 7808
+      targetPort: 7808
+      protocol: TCP
+      name: http
+  selector:
+    app: postgres-meta
+{{- end }}

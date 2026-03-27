@@ -1,0 +1,18 @@
+# ConfigMap for PostgreSQL configuration (pg_duckdb shared_preload_libraries)
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+  namespace: data
+data:
+  configure-extensions.sh: |
+    #!/bin/bash
+    CONFIG_FILE="${PGDATA}/postgresql.conf"
+    if [ -f "$CONFIG_FILE" ]; then
+      if ! grep -q "shared_preload_libraries" "$CONFIG_FILE"; then
+        echo "" >> "$CONFIG_FILE"
+        echo "shared_preload_libraries = 'pg_duckdb'" >> "$CONFIG_FILE"
+        echo "duckdb.enable_optimizer = on" >> "$CONFIG_FILE"
+      fi
+    fi

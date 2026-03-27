@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.infraConfig.name }}
+  namespace: {{ include "microscaler-supabase.namespace" . }}
+  labels:
+    {{- include "microscaler-supabase.labels" . | nindent 4 }}
+data:
+{{- $ph := .Values.infraConfig.namespacePlaceholder }}
+{{- $ns := .Release.Namespace }}
+{{- range $k, $v := .Values.infraConfig.data }}
+  {{ $k }}: {{ if $ph }}{{ replace $ph $ns ($v | toString) | quote }}{{ else }}{{ $v | toString | quote }}{{ end }}
+{{- end }}
+{{- range $k, $v := .Values.infraConfig.extra }}
+  {{ $k }}: {{ if $ph }}{{ replace $ph $ns ($v | toString) | quote }}{{ else }}{{ $v | toString | quote }}{{ end }}
+{{- end }}

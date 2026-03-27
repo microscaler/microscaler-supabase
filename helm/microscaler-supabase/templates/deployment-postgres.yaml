@@ -1,0 +1,143 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: {{ include "microscaler-supabase.namespace" . }}
+  labels:
+    {{- include "microscaler-supabase.labels" . | nindent 4 }}
+    app: postgres
+spec:
+  replicas: {{ .Values.postgres.replicas }}
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+        {{- include "microscaler-supabase.labels" . | nindent 8 }}
+      annotations:
+        {{- range $k, $v := .Values.postgres.podAnnotations }}
+        {{ $k }}: {{ $v | quote }}
+        {{- end }}
+    spec:
+      initContainers:
+        - name: create-dirs
+          image: {{ .Values.postgres.initBusyboxImage | quote }}
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /var/lib/postgresql/data
+              chmod -R 755 /var/lib/postgresql/data
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: storage
+              mountPath: /var/lib/postgresql/data
+        - name: configure-postgres
+          image: {{ .Values.postgres.image | quote }}
+          command:
+            - sh
+            - -c
+            - |
+              export PGDATA=/var/lib/postgresql/data
+              until [ -d "$PGDATA" ]; do echo "Waiting for data directory..."; sleep 1; done
+              if [ -f "$PGDATA/postgresql.conf" ]; then
+                if grep -q "^shared_preload_libraries" "$PGDATA/postgresql.conf"; then
+                  EXISTING_LIBS=$(grep "^shared_preload_libraries" "$PGDATA/postgresql.conf" | sed "s/^shared_preload_libraries = '\(.*\)'/\1/" | tr -d "'")
+                  NEW_LIBS="pg_duckdb,timescaledb"
+                  for lib in $(echo "$EXISTING_LIBS" | tr ',' ' '); do
+                    ! echo "$NEW_LIBS" | grep -q "$lib" && NEW_LIBS="$NEW_LIBS,$lib"
+                  done
+                  sed -i "s|^shared_preload_libraries = .*|shared_preload_libraries = '$NEW_LIBS'|" "$PGDATA/postgresql.conf"
+                else
+                  echo "" >> "$PGDATA/postgresql.conf"
+                  echo "shared_preload_libraries = 'pg_duckdb,timescaledb,pg_stat_statements,pgaudit,plpgsql,plpgsql_check,pg_cron,pg_net,pgsodium,auto_explain,pg_tle,plan_filter,supabase_vault'" >> "$PGDATA/postgresql.conf"
+                fi
+                grep -q "duckdb.enable_optimizer" "$PGDATA/postgresql.conf" || echo "duckdb.enable_optimizer = on" >> "$PGDATA/postgresql.conf"
+                grep -q "^pg_stat_statements.track" "$PGDATA/postgresql.conf" || echo "pg_stat_statements.track = all" >> "$PGDATA/postgresql.conf"
+                grep -q "^log_destination" "$PGDATA/postgresql.conf" || echo "log_destination = 'stderr'" >> "$PGDATA/postgresql.conf"
+                grep -q "^logging_collector" "$PGDATA/postgresql.conf" || echo "logging_collector = off" >> "$PGDATA/postgresql.conf"
+                grep -q "^log_min_messages" "$PGDATA/postgresql.conf" || echo "log_min_messages = info" >> "$PGDATA/postgresql.conf"
+              fi
+              echo "PostgreSQL configuration updated"
+          volumeMounts:
+            - name: storage
+              mountPath: /var/lib/postgresql/data
+          env:
+            - name: PGDATA
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.infraConfig.name }}
+                  key: PGDATA
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image | quote }}
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.infraConfig.name }}
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microscaler-supabase.infraSecretName" . }}
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microscaler-supabase.infraSecretName" . }}
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.infraConfig.name }}
+                  key: PGDATA
+          volumeMounts:
+            - name: storage
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+            {{- if and .Values.parquetLake.enabled (or (ne .Values.persistence.mode "existingClaim") .Values.persistence.existingClaim.parquet) }}
+            - name: parquet-lake
+              mountPath: /data/parquet
+              readOnly: true
+            {{- end }}
+          resources:
+            {{- toYaml .Values.postgres.resources | nindent 12 }}
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - PGPASSWORD="$POSTGRES_PASSWORD" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p 5432
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - PGPASSWORD="$POSTGRES_PASSWORD" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p 5432
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: {{ include "microscaler-supabase.postgresPvcName" . }}
+        - name: init-scripts
+          configMap:
+            name: postgres-init
+        {{- if and .Values.parquetLake.enabled (or (ne .Values.persistence.mode "existingClaim") .Values.persistence.existingClaim.parquet) }}
+        - name: parquet-lake
+          persistentVolumeClaim:
+            claimName: {{ include "microscaler-supabase.parquetPvcName" . }}
+        {{- end }}
+{{- end }}
