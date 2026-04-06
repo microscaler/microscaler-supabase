@@ -17,14 +17,25 @@ spec:
       labels:
         app: postgres
         {{- include "microscaler-supabase.labels" . | nindent 8 }}
+        {{- with .Values.postgres.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       annotations:
+        checksum/infra-config: {{ include (print $.Template.BasePath "/configmap-infra.yaml") . | sha256sum }}
+        checksum/postgres-init: {{ include (print $.Template.BasePath "/configmap-postgres-init.yaml") . | sha256sum }}
+        checksum/infra-secret: {{ include (print $.Template.BasePath "/secret-infra.yaml") . | sha256sum }}
         {{- range $k, $v := .Values.postgres.podAnnotations }}
         {{ $k }}: {{ $v | quote }}
         {{- end }}
     spec:
+      {{- with .Values.postgres.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       initContainers:
         - name: create-dirs
           image: {{ .Values.postgres.initBusyboxImage | quote }}
+          imagePullPolicy: IfNotPresent
           command:
             - sh
             - -c
@@ -38,6 +49,7 @@ spec:
               mountPath: /var/lib/postgresql/data
         - name: configure-postgres
           image: {{ .Values.postgres.image | quote }}
+          imagePullPolicy: {{ .Values.postgres.imagePullPolicy | quote }}
           command:
             - sh
             - -c
@@ -75,6 +87,11 @@ spec:
       containers:
         - name: postgres
           image: {{ .Values.postgres.image | quote }}
+          imagePullPolicy: {{ .Values.postgres.imagePullPolicy | quote }}
+          {{- with .Values.postgres.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
             - containerPort: 5432
               name: postgres
@@ -112,6 +129,14 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.postgres.resources | nindent 12 }}
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - PGPASSWORD="$POSTGRES_PASSWORD" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1 -p 5432
+            failureThreshold: 30
+            periodSeconds: 10
           readinessProbe:
             exec:
               command:

@@ -54,6 +54,10 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- default "your-super-secret-jwt-token-with-at-least-32-characters-long" .Values.postgres.initSql.jwtSecret -}}
 {{- end }}
 
+{{- define "microscaler-supabase.postgresExporterSecretKey" -}}
+{{- .Values.secret.existingSecretKeys.postgresExporterDataSourceUri -}}
+{{- end }}
+
 {{- define "microscaler-supabase.postgresExporterUri" -}}
 {{- $u := default .Values.secret.data.POSTGRES_USER .Values.postgresExporter.connection.user -}}
 {{- $pw := default .Values.secret.data.POSTGRES_PASSWORD .Values.postgresExporter.connection.password -}}
@@ -61,4 +65,49 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- $host := default "postgres" .Values.postgresExporter.connection.host -}}
 {{- $port := default "5432" .Values.postgresExporter.connection.port -}}
 {{- printf "postgresql://%s:%s@%s:%s/%s?sslmode=disable" $u $pw $host $port $db -}}
+{{- end }}
+
+{{- define "microscaler-supabase.postgrestDbUriSecretKey" -}}
+{{- .Values.secret.existingSecretKeys.postgrestDbUri -}}
+{{- end }}
+
+{{- define "microscaler-supabase.postgrestJwtSecretKey" -}}
+{{- .Values.secret.existingSecretKeys.postgrestJwtSecret -}}
+{{- end }}
+
+{{- define "microscaler-supabase.postgrestAppSettingsJwtSecretKey" -}}
+{{- .Values.secret.existingSecretKeys.postgrestAppSettingsJwtSecret -}}
+{{- end }}
+
+{{- define "microscaler-supabase.postgrestDbUri" -}}
+{{- $db := .Values.infraConfig.data.POSTGRES_DB -}}
+{{- $pw := default (include "microscaler-supabase.initRolePassword" . | trim) .Values.postgres.initPasswords.authenticator -}}
+{{- printf "postgres://authenticator:%s@postgres.%s.svc.cluster.local:5432/%s" $pw .Release.Namespace $db -}}
+{{- end }}
+
+{{- define "microscaler-supabase.validateValues" -}}
+{{- if and (not .Values.secret.create) (empty .Values.secret.existingSecret) -}}
+{{ fail "secret.existingSecret is required when secret.create=false" }}
+{{- end -}}
+{{- if and (eq .Values.persistence.mode "existingClaim") (empty .Values.persistence.existingClaim.postgres) -}}
+{{ fail "persistence.existingClaim.postgres is required when persistence.mode=existingClaim" }}
+{{- end -}}
+{{- if and .Values.parquetLake.enabled (eq .Values.persistence.mode "existingClaim") (empty .Values.persistence.existingClaim.parquet) -}}
+{{ fail "persistence.existingClaim.parquet is required when parquetLake.enabled=true and persistence.mode=existingClaim" }}
+{{- end -}}
+{{- if and (eq .Values.persistence.mode "staticPv") (empty .Values.persistence.nodeHostname) -}}
+{{ fail "persistence.nodeHostname is required when persistence.mode=staticPv" }}
+{{- end -}}
+{{- if and .Values.postgrest.enabled (lt (len (include "microscaler-supabase.jwtSecret" . | trim)) 32) -}}
+{{ fail "postgres.initSql.jwtSecret must be at least 32 characters when postgrest.enabled=true" }}
+{{- end -}}
+{{- if and (not .Values.secret.create) .Values.postgrest.enabled (empty .Values.secret.existingSecretKeys.postgrestDbUri) -}}
+{{ fail "secret.existingSecretKeys.postgrestDbUri is required when postgrest.enabled=true and secret.create=false" }}
+{{- end -}}
+{{- if and (not .Values.secret.create) .Values.postgrest.enabled (empty .Values.secret.existingSecretKeys.postgrestJwtSecret) -}}
+{{ fail "secret.existingSecretKeys.postgrestJwtSecret is required when postgrest.enabled=true and secret.create=false" }}
+{{- end -}}
+{{- if and (not .Values.secret.create) .Values.postgrest.enabled (empty .Values.secret.existingSecretKeys.postgrestAppSettingsJwtSecret) -}}
+{{ fail "secret.existingSecretKeys.postgrestAppSettingsJwtSecret is required when postgrest.enabled=true and secret.create=false" }}
+{{- end -}}
 {{- end }}

@@ -16,7 +16,7 @@ jobs:
       pipeline-context: ${{ steps.detect.outputs.pipeline-context }}
       non-helm-matrix-count: ${{ steps.nonhelm.outputs.count }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Detect Contexts
         id: detect
         uses: octopilot/actions/detect-contexts@main
@@ -35,7 +35,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: octopilot/actions/lint@main
         with:
           pipeline-context: ${{ needs.detect.outputs.pipeline-context }}
@@ -50,7 +50,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.detect.outputs.pipeline-context).matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: octopilot/actions/test@main
         with:
           pipeline-context: ${{ toJson(matrix) }}
@@ -65,7 +65,7 @@ jobs:
     outputs:
       uuid: ${{ steps.export.outputs.uuid }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Validate primary build (Octopilot)
         id: validate_octo
@@ -110,7 +110,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.detect.outputs.pipeline-context).integration_matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -164,7 +164,7 @@ jobs:
     needs: integration-artifacts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v4
         with:
           pattern: integration-*

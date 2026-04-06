@@ -1,12 +1,15 @@
 1. Postgres (release {{ .Release.Name }}): connect from inside the cluster with
    postgres.{{ include "microscaler-supabase.namespace" . }}.svc.cluster.local:5432
 
-2. First install: ensure PVCs bind before the postgres pod schedules. With persistence.mode=staticPv,
+2. The chart now owns the preferred deployment path. Treat `k8s/` as legacy manifests and keep new changes in Helm first.
+
+3. First install: ensure PVCs bind before the postgres pod schedules. With persistence.mode=staticPv,
    PVs use hostPath and nodeAffinity; the node must match persistence.nodeHostname.
 
-3. Uninstall: PVs with reclaimPolicy Retain are not removed by helm uninstall; delete PVs manually if needed.
+4. Uninstall: PVs with reclaimPolicy Retain are not removed by helm uninstall; delete PVs manually if needed.
 
-4. Secrets: for production use secret.create=false and an existing Secret that includes
-   POSTGRES_EXPORTER_DATA_SOURCE_URI (or the key set in secret.existingSecretKeys.postgresExporterDataSourceUri).
+5. Secrets: for production use secret.create=false and an existing Secret that includes any enabled component keys
+   (postgres exporter, and postgrest when enabled).
 
-5. When using secret.existingSecret, set postgres.initPasswords.default to match your role passwords used in postgres-init SQL.
+6. If you enable postgrest, the chart renders the service `postgrest.{{ include "microscaler-supabase.namespace" . }}.svc.cluster.local:{{ .Values.postgrest.service.port }}`
+   and will derive DB/JWT secrets automatically when secret.create=true.

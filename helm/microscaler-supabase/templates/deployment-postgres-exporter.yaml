@@ -8,7 +8,7 @@ metadata:
     {{- include "microscaler-supabase.labels" . | nindent 4 }}
     app: postgres-exporter
 spec:
-  replicas: 1
+  replicas: {{ .Values.postgresExporter.replicas }}
   selector:
     matchLabels:
       app: postgres-exporter
@@ -17,19 +17,46 @@ spec:
       labels:
         app: postgres-exporter
         {{- include "microscaler-supabase.labels" . | nindent 8 }}
+        {{- with .Values.postgresExporter.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/infra-secret: {{ include (print $.Template.BasePath "/secret-infra.yaml") . | sha256sum }}
+        {{- with .Values.postgresExporter.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
+      {{- with .Values.postgresExporter.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: postgres-exporter
           image: {{ .Values.postgresExporter.image | quote }}
+          imagePullPolicy: {{ .Values.postgresExporter.imagePullPolicy | quote }}
+          {{- with .Values.postgresExporter.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             - name: DATA_SOURCE_URI
               valueFrom:
                 secretKeyRef:
                   name: {{ include "microscaler-supabase.infraSecretName" . }}
-                  key: {{ .Values.secret.existingSecretKeys.postgresExporterDataSourceUri | quote }}
+                  key: {{ include "microscaler-supabase.postgresExporterSecretKey" . | quote }}
           ports:
-            - containerPort: 9187
+            - containerPort: {{ .Values.postgresExporter.service.port }}
               name: metrics
           resources:
             {{- toYaml .Values.postgresExporter.resources | nindent 12 }}
+          readinessProbe:
+            tcpSocket:
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: metrics
+            initialDelaySeconds: 30
+            periodSeconds: 10
 {{- end }}

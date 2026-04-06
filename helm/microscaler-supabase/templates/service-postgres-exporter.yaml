@@ -7,11 +7,15 @@ metadata:
   labels:
     {{- include "microscaler-supabase.labels" . | nindent 4 }}
     app: postgres-exporter
+  {{- with .Values.postgresExporter.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  type: ClusterIP
+  type: {{ .Values.postgresExporter.service.type | quote }}
   ports:
-    - port: 9187
-      targetPort: 9187
+    - port: {{ .Values.postgresExporter.service.port }}
+      targetPort: metrics
       name: metrics
   selector:
     app: postgres-exporter

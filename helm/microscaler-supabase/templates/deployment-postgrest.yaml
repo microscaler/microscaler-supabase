@@ -1,94 +1,101 @@
-{{- if .Values.postgresMeta.enabled }}
+{{- if .Values.postgrest.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: postgres-meta
+  name: postgrest
   namespace: {{ include "microscaler-supabase.namespace" . }}
   labels:
     {{- include "microscaler-supabase.labels" . | nindent 4 }}
-    app: postgres-meta
+    app: postgrest
 spec:
-  replicas: {{ .Values.postgresMeta.replicas }}
+  replicas: {{ .Values.postgrest.replicas }}
   selector:
     matchLabels:
-      app: postgres-meta
+      app: postgrest
   template:
     metadata:
       labels:
-        app: postgres-meta
+        app: postgrest
         {{- include "microscaler-supabase.labels" . | nindent 8 }}
-        {{- with .Values.postgresMeta.podLabels }}
+        {{- with .Values.postgrest.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       annotations:
         checksum/infra-config: {{ include (print $.Template.BasePath "/configmap-infra.yaml") . | sha256sum }}
         checksum/infra-secret: {{ include (print $.Template.BasePath "/secret-infra.yaml") . | sha256sum }}
-        {{- with .Values.postgresMeta.podAnnotations }}
+        {{- with .Values.postgrest.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      {{- with .Values.postgresMeta.podSecurityContext }}
+      {{- with .Values.postgrest.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
-        - name: postgres-meta
-          image: {{ .Values.postgresMeta.image | quote }}
-          imagePullPolicy: {{ .Values.postgresMeta.imagePullPolicy | quote }}
-          {{- with .Values.postgresMeta.containerSecurityContext }}
+        - name: postgrest
+          image: {{ .Values.postgrest.image | quote }}
+          imagePullPolicy: {{ .Values.postgrest.imagePullPolicy | quote }}
+          {{- with .Values.postgrest.containerSecurityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           ports:
-            - containerPort: {{ .Values.postgresMeta.service.port }}
+            - containerPort: {{ .Values.postgrest.service.port }}
               name: http
           env:
-            - name: PG_META_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ .Values.infraConfig.name }}
-                  key: POSTGRES_META_PORT
-            - name: PG_META_DB_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ .Values.infraConfig.name }}
-                  key: POSTGRES_META_DB_HOST
-            - name: PG_META_DB_PORT
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ .Values.infraConfig.name }}
-                  key: POSTGRES_META_DB_PORT
-            - name: PG_META_DB_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ .Values.infraConfig.name }}
-                  key: POSTGRES_META_DB_NAME
-            - name: PG_META_DB_USER
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ .Values.infraConfig.name }}
-                  key: POSTGRES_META_DB_USER
-            - name: PG_META_DB_PASSWORD
+            - name: PGRST_SERVER_HOST
+              value: {{ .Values.postgrest.env.serverHost | quote }}
+            - name: PGRST_SERVER_PORT
+              value: {{ .Values.postgrest.service.port | quote }}
+            - name: PGRST_DB_URI
               valueFrom:
                 secretKeyRef:
                   name: {{ include "microscaler-supabase.infraSecretName" . }}
-                  key: POSTGRES_META_DB_PASSWORD
-            - name: CRYPTO_KEY
+                  key: {{ include "microscaler-supabase.postgrestDbUriSecretKey" . | quote }}
+            - name: PGRST_DB_SCHEMAS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.infraConfig.name }}
+                  key: PGRST_DB_SCHEMAS
+            - name: PGRST_DB_EXTRA_SEARCH_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.infraConfig.name }}
+                  key: PGRST_DB_EXTRA_SEARCH_PATH
+            - name: PGRST_DB_ANON_ROLE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.infraConfig.name }}
+                  key: PGRST_DB_ANON_ROLE
+            - name: PGRST_DB_USE_LEGACY_GUCS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.infraConfig.name }}
+                  key: PGRST_DB_USE_LEGACY_GUCS
+            - name: PGRST_APP_SETTINGS_JWT_EXP
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ .Values.infraConfig.name }}
+                  key: PGRST_APP_SETTINGS_JWT_EXP
+            - name: PGRST_JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ include "microscaler-supabase.infraSecretName" . }}
-                  key: POSTGRES_META_DB_PASSWORD_ENCRYPTION_KEY
+                  key: {{ include "microscaler-supabase.postgrestJwtSecretKey" . | quote }}
+            - name: PGRST_APP_SETTINGS_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "microscaler-supabase.infraSecretName" . }}
+                  key: {{ include "microscaler-supabase.postgrestAppSettingsJwtSecretKey" . | quote }}
           resources:
-            {{- toYaml .Values.postgresMeta.resources | nindent 12 }}
+            {{- toYaml .Values.postgrest.resources | nindent 12 }}
           readinessProbe:
-            httpGet:
-              path: /health
+            tcpSocket:
               port: http
             initialDelaySeconds: 5
-            periodSeconds: 5
+            periodSeconds: 10
           livenessProbe:
-            httpGet:
-              path: /health
+            tcpSocket:
               port: http
             initialDelaySeconds: 30
             periodSeconds: 10

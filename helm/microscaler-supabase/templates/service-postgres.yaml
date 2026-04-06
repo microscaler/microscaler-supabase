@@ -7,6 +7,10 @@ metadata:
   labels:
     {{- include "microscaler-supabase.labels" . | nindent 4 }}
     app: postgres
+  {{- with .Values.postgres.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   type: {{ .Values.postgres.service.type | quote }}
   ports:

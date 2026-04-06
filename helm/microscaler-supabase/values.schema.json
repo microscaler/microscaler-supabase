@@ -1,26 +1,129 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
+  "additionalProperties": true,
   "properties": {
     "createNamespace": { "type": "boolean" },
     "nameOverride": { "type": "string" },
     "postgres": {
       "type": "object",
+      "additionalProperties": true,
       "properties": {
         "enabled": { "type": "boolean" },
-        "replicas": { "type": "integer", "minimum": 1 }
+        "image": { "type": "string", "minLength": 1 },
+        "imagePullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] },
+        "initBusyboxImage": { "type": "string", "minLength": 1 },
+        "replicas": { "type": "integer", "minimum": 1 },
+        "podAnnotations": { "type": "object" },
+        "podLabels": { "type": "object" },
+        "podSecurityContext": { "type": "object" },
+        "containerSecurityContext": { "type": "object" },
+        "resources": { "type": "object" },
+        "service": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "nodePort": { "type": "integer", "minimum": 30000, "maximum": 32767 },
+            "annotations": { "type": "object" }
+          }
+        },
+        "initSql": {
+          "type": "object",
+          "properties": {
+            "jwtSecret": { "type": "string" }
+          }
+        },
+        "initPasswords": { "type": "object" }
       }
     },
     "postgresMeta": {
       "type": "object",
+      "additionalProperties": true,
       "properties": {
-        "enabled": { "type": "boolean" }
+        "enabled": { "type": "boolean" },
+        "image": { "type": "string", "minLength": 1 },
+        "imagePullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] },
+        "replicas": { "type": "integer", "minimum": 1 },
+        "podAnnotations": { "type": "object" },
+        "podLabels": { "type": "object" },
+        "podSecurityContext": { "type": "object" },
+        "containerSecurityContext": { "type": "object" },
+        "resources": { "type": "object" },
+        "service": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "annotations": { "type": "object" }
+          }
+        }
       }
     },
     "postgresExporter": {
       "type": "object",
+      "additionalProperties": true,
       "properties": {
-        "enabled": { "type": "boolean" }
+        "enabled": { "type": "boolean" },
+        "image": { "type": "string", "minLength": 1 },
+        "imagePullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] },
+        "replicas": { "type": "integer", "minimum": 1 },
+        "podAnnotations": { "type": "object" },
+        "podLabels": { "type": "object" },
+        "podSecurityContext": { "type": "object" },
+        "containerSecurityContext": { "type": "object" },
+        "resources": { "type": "object" },
+        "service": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "annotations": { "type": "object" }
+          }
+        },
+        "connection": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "host": { "type": "string" },
+            "port": { "type": "string" },
+            "user": { "type": "string" },
+            "password": { "type": "string" }
+          }
+        }
+      }
+    },
+    "postgrest": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": { "type": "string", "minLength": 1 },
+        "imagePullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] },
+        "replicas": { "type": "integer", "minimum": 1 },
+        "podAnnotations": { "type": "object" },
+        "podLabels": { "type": "object" },
+        "podSecurityContext": { "type": "object" },
+        "containerSecurityContext": { "type": "object" },
+        "resources": { "type": "object" },
+        "service": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "annotations": { "type": "object" }
+          }
+        },
+        "env": {
+          "type": "object",
+          "properties": {
+            "serverHost": { "type": "string" }
+          }
+        }
       }
     },
     "parquetLake": {
@@ -33,6 +136,7 @@
     "persistence": {
       "type": "object",
       "required": ["mode"],
+      "additionalProperties": true,
       "properties": {
         "mode": {
           "type": "string",
@@ -41,8 +145,24 @@
         "storageClassName": { "type": "string" },
         "reclaimPolicy": { "type": "string", "enum": ["Retain", "Delete"] },
         "nodeHostname": { "type": "string" },
-        "postgres": { "type": "object" },
-        "parquet": { "type": "object" },
+        "postgres": {
+          "type": "object",
+          "properties": {
+            "pvName": { "type": "string" },
+            "pvcName": { "type": "string" },
+            "size": { "type": "string" },
+            "hostPath": { "type": "string" }
+          }
+        },
+        "parquet": {
+          "type": "object",
+          "properties": {
+            "pvName": { "type": "string" },
+            "pvcName": { "type": "string" },
+            "size": { "type": "string" },
+            "hostPath": { "type": "string" }
+          }
+        },
         "existingClaim": {
           "type": "object",
           "properties": {
@@ -63,6 +183,7 @@
     },
     "secret": {
       "type": "object",
+      "additionalProperties": true,
       "properties": {
         "create": { "type": "boolean" },
         "name": { "type": "string" },
@@ -71,7 +192,10 @@
         "existingSecretKeys": {
           "type": "object",
           "properties": {
-            "postgresExporterDataSourceUri": { "type": "string" }
+            "postgresExporterDataSourceUri": { "type": "string" },
+            "postgrestDbUri": { "type": "string" },
+            "postgrestJwtSecret": { "type": "string" },
+            "postgrestAppSettingsJwtSecret": { "type": "string" }
           }
         }
       }

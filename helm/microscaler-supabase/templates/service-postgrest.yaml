@@ -1,23 +1,23 @@
-{{- if .Values.postgresMeta.enabled }}
+{{- if .Values.postgrest.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres-meta
+  name: postgrest
   namespace: {{ include "microscaler-supabase.namespace" . }}
   labels:
     {{- include "microscaler-supabase.labels" . | nindent 4 }}
-    app: postgres-meta
-  {{- with .Values.postgresMeta.service.annotations }}
+    app: postgrest
+  {{- with .Values.postgrest.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  type: {{ .Values.postgresMeta.service.type | quote }}
+  type: {{ .Values.postgrest.service.type | quote }}
   ports:
-    - port: {{ .Values.postgresMeta.service.port }}
+    - port: {{ .Values.postgrest.service.port }}
       targetPort: http
       protocol: TCP
       name: http
   selector:
-    app: postgres-meta
+    app: postgrest
 {{- end }}
