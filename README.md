@@ -57,11 +57,15 @@ cd microscaler-supabase
 
 ## Overlays (per-consumer)
 
+- **k8s/overlays/hauliage** — PV `nodeAffinity` for Kind cluster `hauliage` (node `hauliage-control-plane`). Consumed by the Hauliage app repo’s `k8s/data/supabase` kustomization (requires this repo as a side clone next to `ai/`).
 - **k8s/overlays/seasame-idam** — PVs patched for Kind cluster `sesame-idam` (node `sesame-idam-control-plane`, hostPath `/mnt/sesame-idam-data/postgres` and `parquet-lake`). From seasame-idam run: `just supabase-apply` (applies from this repo with this overlay).
 
 ## Consuming from another repo
 
-- **Side clone:** Keep microscaler-supabase as a sibling. From consumer (e.g. seasame-idam): `just supabase-apply` (cd to microscaler-supabase and `kubectl apply -k k8s/overlays/<consumer>`). App config: DB host `postgres.data.svc.cluster.local`.
+- **Side clone:** Keep microscaler-supabase as a sibling of `ai/` (or your monorepo root). Example layout: `microscaler/ai/hauliage` and `microscaler/microscaler-supabase`. Hauliage’s Tiltfile runs `kustomize build k8s/data/supabase`, which points at `k8s/overlays/hauliage` in this repo.
+- **Kustomize from consumer:** `kubectl apply -k` on `k8s/overlays/<consumer>` (e.g. `hauliage`, `seasame-idam`, `pricewhisperer`). App config: DB host `postgres.data.svc.cluster.local`.
+- **Helm (local chart path):** `helm upgrade --install supabase ./helm/microscaler-supabase -n data --create-namespace` from a checkout of this repo. Values can override `persistence.nodeHostname`, images, and secrets; see [helm/microscaler-supabase/README.md](helm/microscaler-supabase/README.md).
+- **Helm from Git (no submodule):** add a chart dependency or CI step that pins a Git ref, e.g. `helm install supabase oci://<registry>/charts/microscaler-supabase` once the chart is published by [Release](.github/workflows/release.yml), or vendor the `helm/microscaler-supabase` directory via submodule / sparse checkout.
 - **Later (submodule):** `git submodule add <url> microscaler-supabase`; same apply flow.
 - Use image `casibbald/postgres:17-duckdb-supabase-v2` or build from this repo.
 
