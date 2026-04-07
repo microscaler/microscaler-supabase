@@ -58,6 +58,7 @@ cd microscaler-supabase
 ## Overlays (per-consumer)
 
 - **k8s/overlays/hauliage** — PV `nodeAffinity` for Kind cluster `hauliage` (node `hauliage-control-plane`). Consumed by the Hauliage app repo’s `k8s/data/supabase` kustomization (requires this repo as a side clone next to `ai/`).
+- **k8s/overlays/shared-kind** — PV `nodeAffinity` for the shared microscaler Kind cluster (default name `kind`, node `kind-control-plane`). Consumed by **`shared-kind-cluster`** (`kustomize` from `microscaler/shared-kind-cluster/k8s`). Keep this repo as a sibling of `shared-kind-cluster` under `microscaler/`.
 - **k8s/overlays/seasame-idam** — PVs patched for Kind cluster `sesame-idam` (node `sesame-idam-control-plane`, hostPath `/mnt/sesame-idam-data/postgres` and `parquet-lake`). From seasame-idam run: `just supabase-apply` (applies from this repo with this overlay).
 
 ## Consuming from another repo

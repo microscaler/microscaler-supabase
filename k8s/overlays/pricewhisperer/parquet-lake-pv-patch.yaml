@@ -1,0 +1,15 @@
+# See postgres-pv-patch.yaml — match shared Kind (`kind-control-plane`) and legacy cluster node.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: parquet-lake-pv
+spec:
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - kind-control-plane
+          - pricewhisperer-control-plane

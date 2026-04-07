@@ -81,11 +81,10 @@ spec:
             configMapKeyRef:
               name: infra-config
               key: POSTGRES_DB
+        # Role name must be ≤63 bytes (PG identifier limit). Secrets may hold long or generated
+        # values; keep the superuser role fixed to `postgres` (matches readinessProbe below).
         - name: POSTGRES_USER
-          valueFrom:
-            secretKeyRef:
-              name: infra-secrets
-              key: POSTGRES_USER
+          value: "postgres"
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:

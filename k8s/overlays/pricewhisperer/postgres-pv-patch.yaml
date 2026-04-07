@@ -1,0 +1,17 @@
+# Shared Kind default cluster name is `kind` → node `kind-control-plane`.
+# Legacy single-app cluster `kind-pricewhisperer` → `pricewhisperer-control-plane`.
+# List both so hostPath PVs schedule on whichever node exists.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv
+spec:
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - kind-control-plane
+          - pricewhisperer-control-plane
