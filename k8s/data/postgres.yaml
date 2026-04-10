@@ -5,17 +5,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: postgres
+  name: postgres-primary
   namespace: data
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: postgres
+      app: postgres-primary
   template:
     metadata:
       labels:
-        app: postgres
+        app: postgres-primary
       annotations:
         prometheus.io/scrape: "true"
     spec:
@@ -59,6 +59,7 @@ spec:
             grep -q "^logging_collector" "$PGDATA/postgresql.conf" || echo "logging_collector = off" >> "$PGDATA/postgresql.conf"
             grep -q "^log_min_messages" "$PGDATA/postgresql.conf" || echo "log_min_messages = info" >> "$PGDATA/postgresql.conf"
           fi
+          grep -q "^host replication replicator" "$PGDATA/pg_hba.conf" || echo "host replication replicator 0.0.0.0/0 md5" >> "$PGDATA/pg_hba.conf"
           echo "PostgreSQL configuration updated"
         volumeMounts:
         - name: storage
@@ -72,6 +73,12 @@ spec:
       containers:
       - name: postgres
         image: docker.io/casibbald/postgres:17-duckdb-supabase-v2
+        command:
+        - sh
+        - -c
+        - |
+          grep -q "^host replication replicator" /etc/postgresql/pg_hba.conf || echo "host replication replicator 0.0.0.0/0 md5" >> /etc/postgresql/pg_hba.conf || true
+          exec docker-entrypoint.sh postgres -D /etc/postgresql
         ports:
         - containerPort: 5432
           name: postgres
@@ -183,6 +190,11 @@ data:
     CREATE SCHEMA IF NOT EXISTS _supavisor;
     ALTER SCHEMA _supavisor OWNER TO postgres;
     \c postgres
+  06-replication.sql: |
+    DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'replicator') THEN CREATE ROLE replicator WITH REPLICATION LOGIN PASSWORD 'postgres'; ELSE ALTER ROLE replicator WITH PASSWORD 'postgres'; END IF; END $$;
+  07-replication-config.sh: |
+    #!/bin/bash
+    grep -q "^host replication replicator" "$PGDATA/pg_hba.conf" || echo "host replication replicator 0.0.0.0/0 md5" >> "$PGDATA/pg_hba.conf"
 ---
 apiVersion: v1
 kind: Service
@@ -197,4 +209,4 @@ spec:
     nodePort: 30432
     name: postgres
   selector:
-    app: postgres
+    app: postgres-primary
