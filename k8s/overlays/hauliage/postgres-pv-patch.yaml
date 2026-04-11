@@ -10,4 +10,5 @@ spec:
         - key: kubernetes.io/hostname
           operator: In
           values:
-          - hauliage-control-plane
+          # Default Kind node when cluster name is `kind` (shared-kind-cluster / hauliage kind-config.yaml).
+          - kind-control-plane

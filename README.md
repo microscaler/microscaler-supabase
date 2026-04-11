@@ -63,7 +63,7 @@ cd microscaler-supabase
 
 ## Consuming from another repo
 
-- **Side clone:** Keep microscaler-supabase as a sibling of `ai/` (or your monorepo root). Example layout: `microscaler/ai/hauliage` and `microscaler/microscaler-supabase`. Hauliage’s Tiltfile runs `kustomize build k8s/data/supabase`, which points at `k8s/overlays/hauliage` in this repo.
+- **Side clone:** Keep microscaler-supabase as a sibling of app repos under your monorepo root (e.g. `microscaler/`). Example layout: `microscaler/hauliage` and `microscaler/microscaler-supabase`. Hauliage’s Tiltfile runs `kustomize build k8s/data/supabase`, which points at `k8s/overlays/hauliage` in this repo.
 - **Kustomize from consumer:** `kubectl apply -k` on `k8s/overlays/<consumer>` (e.g. `hauliage`, `seasame-idam`, `pricewhisperer`). App config: DB host `postgres.data.svc.cluster.local`.
 - **Helm (local chart path):** `helm upgrade --install supabase ./helm/microscaler-supabase -n data --create-namespace` from a checkout of this repo. Values can override `persistence.nodeHostname`, images, and secrets; see [helm/microscaler-supabase/README.md](helm/microscaler-supabase/README.md).
 - **Helm from Git (no submodule):** add a chart dependency or CI step that pins a Git ref, e.g. `helm install supabase oci://<registry>/charts/microscaler-supabase` once the chart is published by [Release](.github/workflows/release.yml), or vendor the `helm/microscaler-supabase` directory via submodule / sparse checkout.

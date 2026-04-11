@@ -10,4 +10,4 @@ spec:
         - key: kubernetes.io/hostname
           operator: In
           values:
-          - hauliage-control-plane
+          - kind-control-plane
