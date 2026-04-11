@@ -13,11 +13,11 @@ metadata:
   name: microscaler-supabase
 build:
   artifacts:
-    - image: ghcr.io/casibbald/microscaler-supabase-postgres
+    - image: ghcr.io/microscaler/microscaler-supabase-postgres
       context: docker/postgres
       docker:
         dockerfile: Dockerfile
-    - image: ghcr.io/casibbald/microscaler-supabase-chart
+    - image: ghcr.io/microscaler/microscaler-supabase-chart
       context: helm/microscaler-supabase
       buildpacks:
         builder: ghcr.io/octopilot/builder-jammy-base:latest
