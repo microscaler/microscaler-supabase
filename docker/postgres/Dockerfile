@@ -59,24 +59,13 @@ RUN apt-get update && apt-get install -y \
 
 # Set build directory
 WORKDIR /tmp
-
-# Install DuckDB library (amd64)
-RUN echo "Installing DuckDB library for linux-amd64" && \
-    wget --no-check-certificate -q https://github.com/duckdb/duckdb/releases/download/v1.4.1/libduckdb-linux-amd64.zip -O /tmp/duckdb.zip && \
-    unzip -q /tmp/duckdb.zip -d /tmp/duckdb && \
-    mkdir -p /usr/local/lib && \
-    cp /tmp/duckdb/libduckdb.so /usr/local/lib/libduckdb.so && \
-    chmod 755 /usr/local/lib/libduckdb.so && \
-    rm -rf /tmp/duckdb /tmp/duckdb.zip && \
-    ldconfig || true
-
 # ======================================================
-# Stage 1a: Build pg_duckdb extension
+# Stage 1a: Build pg_duckdb extension natively
 # ======================================================
+# Note: By omitting DUCKDB_LIBRARY_PATH, pg_duckdb automatically builds duckdb natively
+# from its submodule, guaranteeing perfect ABI matching with the underlying Nix glibc
 RUN git clone --depth 1 --recursive https://github.com/duckdb/pg_duckdb.git /tmp/pg_duckdb && \
     cd /tmp/pg_duckdb && \
-    export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH && \
-    export DUCKDB_LIBRARY_PATH=/usr/local/lib/libduckdb.so && \
     PG_CONFIG=/usr/lib/postgresql/17/bin/pg_config && \
     if [ ! -f "$PG_CONFIG" ]; then \
         PG_CONFIG=$(which pg_config || find /usr -name pg_config 2>/dev/null | head -1); \
@@ -156,9 +145,8 @@ RUN git clone --depth 1 https://github.com/timescale/timescaledb.git /tmp/timesc
 # ======================================================
 FROM supabase/postgres:17.6.1.035
 
-# Copy DuckDB library from builder
-COPY --from=builder /usr/local/lib/libduckdb.so /usr/local/lib/libduckdb.so
-RUN ldconfig || true
+# Copy DuckDB native library compiled by pg_duckdb
+COPY --from=builder /usr/lib/postgresql/17/lib/libduckdb.so /usr/lib/postgresql/17/lib/
 
 # Copy all extension files from builder
 COPY --from=builder /usr/lib/postgresql/17/lib/pg_duckdb.so /usr/lib/postgresql/17/lib/
