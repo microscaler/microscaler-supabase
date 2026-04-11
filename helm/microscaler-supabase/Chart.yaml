@@ -2,7 +2,7 @@ apiVersion: v2
 name: microscaler-supabase
 description: Supabase-oriented Postgres stack (custom image, postgres-meta, exporter, parquet lake) for Microscaler
 type: application
-version: 0.1.1
+version: 0.1.2
 appVersion: "17"
 keywords:
   - supabase
