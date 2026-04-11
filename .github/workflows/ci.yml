@@ -125,7 +125,7 @@ jobs:
         run: |
           set -euo pipefail
           SUFFIX="${{ matrix.suffix }}"
-          TAG="ttl.sh/${TTL_UUID}-${SUFFIX}:1h"
+          TAG="ttl.sh/${TTL_UUID}-${SUFFIX}:1d"
           CTX="${{ matrix.context }}"
           DF="${{ matrix.dockerfile }}"
           if [ -z "$DF" ] || [ "$DF" = "null" ]; then DF="Dockerfile"; fi
