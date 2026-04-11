@@ -61,11 +61,11 @@ spec:
               key: POSTGRES_META_DB_PASSWORD_ENCRYPTION_KEY
         resources:
           requests:
-            memory: "64Mi"
-            cpu: "50m"
+            memory: "32Mi"
+            cpu: "25m"
           limits:
-            memory: "256Mi"
-            cpu: "200m"
+            memory: "128Mi"
+            cpu: "100m"
         readinessProbe:
           httpGet:
             path: /health
