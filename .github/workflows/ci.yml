@@ -183,3 +183,58 @@ jobs:
             echo "::error::Expected at least 2 integration builds (postgres image + chart), got $COUNT"
             exit 1
           fi
+
+  publish:
+    name: Publish (${{ matrix.output_key }})
+    needs: [detect, integration-verify]
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch') || (github.ref == 'refs/heads/main' && github.event_name == 'push') || (github.ref == 'refs/heads/master' && github.event_name == 'push')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.detect.outputs.pipeline-context).integration_matrix }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Publish Docker image
+        id: docker_build
+        if: matrix.build_method == 'docker'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          IMAGE="${{ matrix.image }}"
+          CTX="${{ matrix.context }}"
+          DF="${{ matrix.dockerfile }}"
+          if [ -z "$DF" ] || [ "$DF" = "null" ]; then DF="Dockerfile"; fi
+          
+          echo "Publishing ${IMAGE}:${TAG} (context=${CTX}, file=${DF})"
+          docker buildx build --platform linux/amd64 --push \
+            -t "${IMAGE}:${TAG}" \
+            -t "${IMAGE}:latest" \
+            -f "${CTX}/${DF}" \
+            "${CTX}"
+
+      - name: Publish chart (Octopilot Pack)
+        id: op_build
+        if: matrix.build_method == 'pack'
+        uses: octopilot/actions/octopilot@main
+        with:
+          version: ${{ github.ref_name }}
+          registry: ghcr.io/${{ github.repository_owner }}
+          artifact: ${{ matrix.image }}
